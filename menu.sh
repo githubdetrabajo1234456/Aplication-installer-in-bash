@@ -49,14 +49,14 @@ function CopiarFicherosProyectoNuevaUbicacion()
    if [ ! -e "/home/$USER/formulariocitas.tar.gz" ]
         then
 echo -e "no tienes el fichero preparado, ejecuta la opción 0"
-   elif [ -d "/var/www/formulariocitas" != 0 ]
+   elif [ ! -d "/var/www/formulariocitas" ]
         then
 echo -e "no tienes el directorio preparado, ejecuta la opción 2"
    else
     echo "Moviendo el fichero..."
     mv /home/$USER/formulariocitas.tar.gz /var/www/formulariocitas/
     echo "Descomprimiendo el fichero..."
-    sudo tar xvzf /var/www/formulariocitas.tar.gz
+    sudo tar xvzf /var/www/formulariocitas/formulariocitas.tar.gz
    fi
    read -p "PULSA ENTER PARA CONTINUAR..."
    
@@ -134,9 +134,10 @@ deactivate
 ### Opcion 9 ###
 function Probandotodoconservidordedesarrollodeflask()
 {
-source v/var/www/formulariocitas/venv/bin/activate
-firefox http://127.0.0.1:5000/
-/home/$USER/formulariocitas/app.py
+cd /var/www/formulariocitas
+source venv/bin/activate
+firefox http://127.0.0.1:5000 &
+python3 /var/www/formulariocitas/app.py
 }
 
 ### Opcion 10 ###
@@ -147,11 +148,12 @@ if [ -z "$instaladorNGINX" ]
 then
 echo "instalando \n"
 sudo apt update
-sudo apt install nginx.service
+sudo apt install nginx
 sudo systemctl start nginx.service
 sudo systemctl status nginx.service
 else
 echo -e "nginx.service ya esta instalado en el dispositivo"
+fi
 }
 
 ### Opcion 11 ###
@@ -165,7 +167,6 @@ echo -e "arrancando\n"
 sudo systemctl start nginx.service
 else
 echo "mysql.service ya esta arrancado"
-fi
 sudo systemctl status nginx.service
 fi
 }
@@ -182,6 +183,7 @@ sudo apt install net-tools
 sudo netstat -anp | grep nginx
 else
 sudo netstat -anp | grep nginx
+fi
 }
 
 ### Opcion 13 ###
@@ -200,67 +202,140 @@ echo "Sin implementar UnU"
 ### Opcion 15 ###
 function InstalarGunicorn()
 {
-echo "Sin implementar UnU"
+instaladorGunicorn = $(sudo dpkg -s gunicorn | grep "Status: install ok installed")
+if [ -z "$instaladorGunicorn" ]
+then
+cd /var/www/formulariocitas
+source venv/bin/activate
+echo "instalando \n"
+pip install gunicorn
+deactivate
+else
+echo "Gunicorn ya está instalado \n"
+fi
 }
 
 ### Opcion 16 ###
 function ConfigurarGunicorn()
 {
-echo "Sin implementar UnU"
+sudo echo 'from app import app
+if __name__ == "__main__":
+   app.run()' > /var/www/formulariocitas/wsgi.py
+source venv/bin/activate
+/var/www/formulariocitas$ gunicorn --bind 127.0.0.1:5000 wsgi:app
+deactivate
 }
 
 ### Opcion 17 ###
 function PasarPropiedadyPermisos()
 {
-echo "Sin implementar UnU"
+#pasamos la propiedad de todo dentro de formulariocitas a www-data y cambiamos el grupo de eso mismo tambien a www-data
+sudo chown -R www-data:www-data /var/www/formulariocitas
 }
 
 ### Opcion 18 ###
 function crearServicioSystemdFormularioCitas()
 {
-echo "Sin implementar UnU"
+sudo echo '[Unit]
+Description=Gunicorn instance to serve Flask
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/formulariocitas
+Environment="PATH=/var/www/formulariocitas/venv/bin"
+ExecStart=/var/www/formulariocitas/venv/bin/gunicorn --bind 127.0.0.1:5000 wsgi:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target' > /etc/systemd/system/formulariocitas.service
+sudo systemctl daemon-reload
+sudo systemctl start formulariocitas
+systemctl status formulariocitas
 }
 
 ### Opcion 19 ###
 function ConfigurarNginxProxyInverso()
 {
-echo "Sin implementar UnU"
+sudo echo 'server {
+    listen 8080;
+    server_name localhost;
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+    }
+}' > /etc/nginx/conf.d/formulariocitas.conf
+sudo nginx -t
 }
 
 ### Opcion 20 ###
 function CargarFicherosConfiguracionNginx()
 {
-echo "Sin implementar UnU"
+sudo systemctl reload nginx
 }
 
 ### Opcion 21 ###
 function RearrancarNginx()
 {
-echo "Sin implementar UnU"
+sudo systemctl restart nginx
 }
 
 ### Opcion 22 ###
 function TestearVirtualHost()
 {
-echo "Sin implementar UnU"
+firefox http://127.0.0.1:3128
 }
 
 ### Opcion 23 ###
 function VerNginxLogs()
 {
-echo "Sin implementar UnU"
+tail /var/log/nginx/error.log
 }
 
 ### Opcion 24 ###
 function CopiarServidorRemoto()
 {
-echo "Sin implementar UnU"
-}
+    salida = $(sudo dpkg -s openssh-server | grep "Status: install ok installed")
+    if [ -z "$salida" ]
+    then
+echo "instalando \n"
+sudo apt update
+sudo apt install openssh-server
+    else
+echo -e "openssh-server ya esta instalado en el dispositivo"
+    fi
 
+    salida = $(sudo systemctl status oepnssh-server | grep "Active: active(running)")
+    if [ -z "$estadoNGINX" ]
+    then
+echo -e "no esta arrancado\n"
+        echo -e "arrancando\n"
+        sudo systemctl start openssh-server
+    else
+        echo "nginx.service ya esta arrancado"
+    fi
+    sudo systemctl status openssh-server
+
+    read -p "Inserta la IP del servidor" ip
+    scp /home/$USER/formulariocitas.tar.gz $USER@$ip:/home/$USER/
+    scp /home/$USER/menu.sh $USER@$ip:/home/$USER/
+}
 ### Opcion 25 ###
+LOG_DIR="/var/log/"
 function ControlarIntentosConexionSSH()
 {
-echo "Sin implementar UnU"
+  for log_file in $(ls "${LOG_DIR}" | grep "auth.log"); do
+  cat "${LOG_DIR}${log_file}" | grep "sshd" | while read line
+  do
+  if [[ ${line} =~ "Failed" ]]
+  then
+      echo "Status: [fail] Account name: ${line:16:20} Date: ${line:0:15}"
+                elif [[ $line =~ "Accepted" ]]
+                then
+      echo "Status: [accept] Account name: ${line:16:20} Date: ${line:0:15}"
+                fi
+  done
+  done
 }
 
 ### Opcion 26 ###
